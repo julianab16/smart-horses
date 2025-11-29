@@ -1,7 +1,8 @@
 from game import tableroObj, algoritmoMinMax
-
 import tkinter as tk
 from tkinter import  ttk
+import pygame
+import os
 
 class JuegoGUI:
     def __init__(self, root):
@@ -26,9 +27,64 @@ class JuegoGUI:
         self.minmax = None
         self.turno = 0
         self.movimientos_validos_pos = {}
+        self.inicializar_musica_sin_reproducir()
         self.crear_pantalla_inicio()
         self.heuristica = 0
-        
+    
+    def inicializar_musica_sin_reproducir(self):
+        """Inicializa pygame mixer SIN reproducir música"""
+        try:
+            pygame.mixer.init()
+            self.musica_activada = True
+            self.musica_cargada = False  # ✅ Nueva variable para controlar si ya se cargó
+            print("🎵 Sistema de audio inicializado (música en espera)")
+        except pygame.error:
+            print("No se pudo inicializar el sistema de audio")
+            self.musica_activada = False
+            self.musica_cargada = False
+
+    def cargar_y_reproducir_musica(self):
+        if not self.musica_activada or self.musica_cargada:
+            return
+            
+        try:
+            # ✅ Buscar archivo de música
+            archivos_musica = [
+                "musica/musica_deftones.mp3",
+                "musica/background_music.mp3",
+            ]
+            archivo_encontrado = None
+            
+            for archivo in archivos_musica:
+                if os.path.exists(archivo):
+                    archivo_encontrado = archivo
+                    break
+            
+            if archivo_encontrado:
+                pygame.mixer.music.load(archivo_encontrado)
+                pygame.mixer.music.set_volume(0.3)
+                pygame.mixer.music.play(-1)  # Repetir infinitamente
+                self.musica_cargada = True
+                print(f"🎵 Música iniciada: {archivo_encontrado}")
+            else:
+                print("⚠️ No se encontró archivo de música")
+                self.musica_activada = False
+                
+        except pygame.error as e:
+            print(f"Error cargando música: {e}")
+            self.musica_activada = False
+
+    def toggle_musica(self):
+        """Activar/Desactivar música"""
+        if not self.musica_activada:
+            return
+            
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.pause()
+            return False  # Música pausada
+        else:
+            pygame.mixer.music.unpause()
+            return True   # Música reproduciendo
     
     def crear_pantalla_inicio(self):
         # Limpiar ventana
@@ -83,7 +139,7 @@ class JuegoGUI:
             # ✅ Reposicionar botones solo si ya existen
             if botones_windows:
                 y_botones = alto * 0.66
-                separacion = ancho * 0.26
+                separacion = ancho * 0.29
                 canvas.coords(botones_windows['principiante'], centro_x - separacion, y_botones)
                 canvas.coords(botones_windows['amateur'], centro_x, y_botones)
                 canvas.coords(botones_windows['experto'], centro_x + separacion, y_botones)
@@ -94,7 +150,7 @@ class JuegoGUI:
             alto = canvas.winfo_height()
             centro_x = ancho / 2
             y_botones = alto * 0.58
-            separacion = ancho * 0.13
+            separacion = ancho * 0.11
             
             # BOTÓN PRINCIPIANTE (Verde)
             btn_principiante = tk.Frame(canvas, bg="#22c55e", 
@@ -220,6 +276,26 @@ class JuegoGUI:
             btn_experto.bind("<Leave>", lambda e: on_leave(e, btn_experto, "#ef4444"))
             btn_e.bind("<Enter>", lambda e: on_enter(e, btn_experto, "#dc2626"))
             btn_e.bind("<Leave>", lambda e: on_leave(e, btn_experto, "#ef4444"))
+            musica_frame = tk.Frame(canvas, bg="#1a0f3e")
+
+            # BOTÓN DE MÚSICA (esquina superior derecha)
+            if self.musica_cargada and pygame.mixer.music.get_busy():
+                texto_musica = "🎵 ON"
+            else:
+                texto_musica = "🎵 OFF"
+            
+            self.btn_musica = tk.Button(musica_frame,
+                                    text=texto_musica,
+                                    font=("Consolas", 12, "bold"),
+                                    bg="#4a5568",
+                                    fg="white",
+                                    activebackground="#6b7280",
+                                    relief="flat",
+                                    bd=0,
+                                    padx=15,
+                                    pady=8,
+                                    command=self.toggle_musica_btn)
+            self.btn_musica.pack()
             
             # Redibujar el degradado después de crear los botones
             redibujar_degradado()
@@ -230,9 +306,18 @@ class JuegoGUI:
         # ✅ Esperar a que el canvas se renderice y luego crear botones
         canvas.update_idletasks()
         canvas.after(100, crear_botones)  # Esperar 100ms para asegurar que el canvas tenga tamaño
+
+    def toggle_musica_btn(self):
+        """Alternar música desde botón"""
+        if self.musica_activada:
+            musica_activa = self.toggle_musica()
+            self.btn_musica.config(text="🎵 ON" if musica_activa else "🎵 OFF")
     
         
     def iniciar_juego(self, profundidad):
+        if not self.musica_cargada:
+            self.cargar_y_reproducir_musica()
+    
         self.heuristica = profundidad
         self.minmax = algoritmoMinMax(profundidad)
         self.tablero = tableroObj()
@@ -314,10 +399,10 @@ class JuegoGUI:
         jugador_frame = tk.Frame(marcadores_frame, bg="#2563eb",
                                 highlightbackground="#fbbf24",
                                 highlightthickness=0)
-        jugador_frame.grid(row=0, column=0, padx=30, sticky="ew")
+        jugador_frame.grid(row=0, column=0, padx=20, sticky="ew")
         
-        jugador_inner = tk.Frame(jugador_frame, bg="#2563eb",  width=320, height=70)
-        jugador_inner.pack(padx=20, pady=5)
+        jugador_inner = tk.Frame(jugador_frame, bg="#2563eb",  width=335, height=70)
+        jugador_inner.pack(padx=15, pady=5)
         jugador_inner.pack_propagate(False)  
         
         tk.Label(jugador_inner, text="TÚ",
@@ -325,28 +410,28 @@ class JuegoGUI:
                 bg="#2563eb", fg="#bfdbfe").pack(anchor="w", padx=16, pady=(5, 0))
         
         self.lbl_jugador = tk.Label(jugador_inner, text=str(self.jugador.puntaje),
-                                   font=("Consolas", 22, "bold"),
+                                   font=("Consolas", 24, "bold"),
                                    bg="#2563eb", fg="white")
-        self.lbl_jugador.pack(anchor="w", padx=11, pady=(0, 5))
+        self.lbl_jugador.pack(anchor="w", padx=8, pady=(0, 5))
         
         # Marcador MÁQUINA (Gris)
         maquina_frame = tk.Frame(marcadores_frame, bg="#4b5563",
                         highlightbackground="#fbbf24",
                         highlightthickness=0)
-        maquina_frame.grid(row=0, column=1, padx=30, sticky="ew")
+        maquina_frame.grid(row=0, column=1, padx=20, sticky="ew")
 
-        maquina_inner = tk.Frame(maquina_frame, bg="#4b5563", width=320, height=70)
-        maquina_inner.pack(padx=20, pady=5)
+        maquina_inner = tk.Frame(maquina_frame, bg="#4b5563", width=334, height=70)
+        maquina_inner.pack(padx=19, pady=5)
         maquina_inner.pack_propagate(False)  # ✅ IMPORTANTE: mantener después de pack()
 
         tk.Label(maquina_inner, text="MÁQUINA",
                 font=("Consolas", 10),
-                bg="#4b5563", fg="#d1d5db").pack(anchor="w", padx=8, pady=(5, 0))
+                bg="#4b5563", fg="#d1d5db").pack(anchor="w", padx=4, pady=(5, 0))
 
         self.lbl_maquina = tk.Label(maquina_inner, text=str(self.maquina.puntaje),
-                                font=("Consolas", 22, "bold"),
+                                font=("Consolas", 24, "bold"),
                                 bg="#4b5563", fg="white")
-        self.lbl_maquina.pack(anchor="w", padx=10, pady=(0, 5))
+        self.lbl_maquina.pack(anchor="w", padx=8, pady=(0, 5))
 
 
         # Guardar referencias para resaltar turno actual
@@ -387,17 +472,17 @@ class JuegoGUI:
             self.botones_tablero.append(fila)
         
         columna_derecha = tk.Frame(tablero_y_leyenda, bg="#1e293b")
-        columna_derecha.grid(row=0, column=1, padx=15, sticky="n")
+        columna_derecha.grid(row=0, column=1, padx=16, sticky="n")
 
         mensaje_frame = tk.Frame(columna_derecha, bg="#1e293b")
         mensaje_frame.pack(pady=(25, 0))
     
         self.lbl_mensaje = tk.Label(mensaje_frame,
                                 text="",
-                                font=("Consolas", 11, "bold"),
+                                font=("Consolas", 12, "bold"),
                                 bg="#fbbf24", fg="#1e293b",
                                 padx=15, pady=10,
-                                width=25,        
+                                width=22,        
                                 height=2,        
                                 wraplength=250,  
                                 justify="center",
@@ -409,12 +494,12 @@ class JuegoGUI:
         leyenda_frame.pack()
         
         leyenda_inner = tk.Frame(leyenda_frame, bg="white", relief="flat")
-        leyenda_inner.pack(padx=15, pady=30)
+        leyenda_inner.pack(padx=12, pady=30)
         
         # Título de leyenda
         tk.Label(leyenda_inner, text="LEYENDA",
                 font=("Consolas", 14, "bold"),
-                bg="white", fg="#1e293b").grid(row=0, column=0, columnspan=2, pady=(10, 15))
+                bg="white", fg="#1e293b").grid(row=0, column=0, columnspan=2, pady=(21, 1))
         
         # Items de leyenda (ahora en vertical)
         items_leyenda = [
@@ -458,19 +543,51 @@ class JuegoGUI:
         
         
         boton_volver_frame = tk.Frame(columna_derecha, bg="#1e293b")
-        boton_volver_frame.pack(fill="x", pady=(15, 10))
+        boton_volver_frame.pack(fill="x", pady=(3, 15))
         
         tk.Button(boton_volver_frame, text="← VOLVER AL MENÚ",
-                font=("Consolas", 11, "bold"),
+                font=("Consolas", 13, "bold"),
                 bg="#f59e0b", fg="white",
                 activebackground="#d97706",
                 relief="flat",
                 padx=15, pady=8,
                 command=self.crear_pantalla_inicio).pack()
         
+        # ✅ CONTROLES DE MÚSICA
+        musica_controls_frame = tk.Frame(columna_derecha, bg="#1e293b")
+        musica_controls_frame.pack(fill="x", pady=(9, 5))
+        
+        # Botón ON/OFF
+        self.btn_musica_juego = tk.Button(musica_controls_frame,
+                                    text="🎵 ON" if pygame.mixer.music.get_busy() else "🎵 OFF",
+                                    font=("Consolas", 12, "bold"),  # Aumentado de 10 a 12
+                                    bg="#4a5568",
+                                    fg="white",
+                                    activebackground="#6b7280",
+                                    relief="flat",
+                                    bd=0,
+                                    padx=20,  # Aumentado de 10 a 20
+                                    pady=8,   # Aumentado de 5 a 8
+                                    cursor="hand2",
+                                    command=self.toggle_musica_juego)
+        self.btn_musica_juego.pack()
+        
         # Inicializar tablero y centrar
         self.actualizar_tablero()
         self.actualizar_info()
+
+    def toggle_musica_juego(self):
+        """Alternar música desde interfaz del juego"""
+        if not self.musica_cargada:
+            return
+        if self.musica_activada:
+            musica_activa = self.toggle_musica()
+            self.btn_musica_juego.config(text="🎵 ON" if musica_activa else "🎵 OFF")
+
+    def __del__(self):
+        """Limpiar pygame al cerrar la aplicación"""
+        if hasattr(self, 'musica_activada') and self.musica_activada:
+            pygame.mixer.quit()
 
     
     def resaltar_turno_actual(self, es_jugador=True):
@@ -494,24 +611,8 @@ class JuegoGUI:
         self.lbl_mensaje.config(text=mensaje)
         self.actualizar_info()
         self.actualizar_tablero()
-    
-        self.tablero.calcularMovimientosValidosCaballo(self.jugador)
-    
-        # ✅ Si el jugador no tiene movimientos, aplicar penalización
-        if len(self.jugador.movimientosPosibles) == 0:
-            self.jugador.changePuntaje(-4)
-            self.lbl_mensaje.config(text="No tienes movimientos (-4) | Turno de la máquina")
-            self.actualizar_info()
             
-            # ✅ Verificar de nuevo si el juego terminó después de la penalización
-            if self.verificar_fin_juego():
-                return
-            
-        self.root.after(2200, self.turno_maquina)
-    
-    def actualizar_info(self):
-        self.lbl_jugador.config(text=str(self.jugador.puntaje))
-        self.lbl_maquina.config(text=str(self.maquina.puntaje))
+        self.root.after(2100, self.turno_maquina)
     
     def actualizar_tablero(self):
         for i in range(8):
@@ -582,7 +683,7 @@ class JuegoGUI:
             self.lbl_mensaje.config(text=mensaje)
         else:
             self.maquina.changePuntaje(-4)
-            self.lbl_mensaje.config(text="Máquina sin movimientos (-4)    Ahora es tu turno")
+            self.lbl_mensaje.config(text="Máquina sin movimientos    Ahora es tu turno")
 
         self.actualizar_info()
         self.actualizar_tablero()
@@ -594,11 +695,12 @@ class JuegoGUI:
         # Si el jugador tiene movimientos, resaltarlos
         if len(self.jugador.movimientosPosibles) > 0:
             self.resaltar_movimientos_validos()
+
             self.lbl_mensaje.config(text="Es tu turno, selecciona una casilla verde")
         else:
             # Si no tiene movimientos, aplicar penalización y pasar turno
             self.jugador.changePuntaje(-4)
-            self.lbl_mensaje.config(text="No tienes movimientos (-4)    La máquina juega de nuevo")
+            self.lbl_mensaje.config(text="No tienes movimientos    La máquina juega")
             self.actualizar_info()
             
             # Verificar si el juego terminó después de la penalización
@@ -606,11 +708,11 @@ class JuegoGUI:
                 return
             
             # La máquina juega de nuevo
-            self.root.after(2200, self.turno_maquina)
+            self.root.after(2100, self.turno_maquina)
 
     def actualizar_info(self):
-        self.lbl_jugador.config(text=f"♞  Jugador     {self.jugador.puntaje}")
-        self.lbl_maquina.config(text=f"♘  Máquina     {self.maquina.puntaje}")
+        self.lbl_jugador.config(text=f"♞  Jugador    {self.jugador.puntaje}")
+        self.lbl_maquina.config(text=f"♘  Máquina    {self.maquina.puntaje}")
 
     def verificar_fin_juego(self):
         self.tablero.calcularMovimientosValidosCaballo(self.jugador)
